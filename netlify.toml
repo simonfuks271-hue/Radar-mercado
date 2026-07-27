@@ -1,0 +1,6 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[functions."refresh-signals"]
+  schedule = "*/30 * * * *"
