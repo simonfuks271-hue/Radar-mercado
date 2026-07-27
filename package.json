@@ -1,0 +1,8 @@
+{
+  "name": "radar-mercado",
+  "version": "1.0.0",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "@anthropic-ai/sdk": "^0.27.0"
+  }
+}
