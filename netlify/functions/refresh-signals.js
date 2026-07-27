@@ -5,10 +5,11 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Cuantos tickers distintos procesamos como maximo por corrida.
-// Mas alto = mas cobertura pero mas costo (1 llamada a Claude por ticker).
-const MAX_TICKERS = 30;
+const MAX_TICKERS = 60;
 // Cuantos articulos de noticias generales miramos para descubrir tickers.
-const NEWS_FEED_LIMIT = 100;
+// Mas alto = mas chance de encontrar acciones chicas/poco conocidas, no
+// solo las grandes que siempre estan en el feed.
+const NEWS_FEED_LIMIT = 500;
 
 // 1) Trae el feed general de noticias (sin filtrar por ticker) y arma
 //    un mapa de que tickers aparecen mencionados y con que frecuencia.
@@ -107,7 +108,7 @@ exports.handler = async function () {
         messages: [
           {
             role: 'user',
-            content: `Analiza estas noticias recientes sobre ${company} (${ticker}):\n${headlines}\n\nRespondé SOLO con un JSON, sin texto adicional ni markdown, con este formato exacto:\n{"sentiment":"pos|neg|neu","score":0-100,"headline":"resumen breve en español de la noticia mas relevante, en tus propias palabras"}\n\nEl "score" representa que tan relevante/atencion-generadora es la noticia (no una prediccion de precio).`,
+            content: `Analiza estas noticias recientes sobre ${company} (${ticker}):\n${headlines}\n\nRespondé SOLO con un JSON, sin texto adicional ni markdown, con este formato exacto:\n{"sentiment":"pos|neg|neu","score":0-100,"headline":"resumen breve en español de la noticia mas relevante, en tus propias palabras"}\n\n"sentiment" = si el contenido de la noticia sugiere una reacción de mercado probablemente alcista (pos), bajista (neg), o neutra/mixta (neu) para esta acción. Esto es una lectura del tono de la noticia, NO una predicción garantizada de precio.\nEl "score" representa que tan relevante/atencion-generadora es la noticia.`,
           },
         ],
       });
