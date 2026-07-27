@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radar — Señales de mercado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0E141F;
+    --panel:#161D2C;
+    --panel-hi:#1C2436;
+    --hair:#2A3448;
+    --ivory:#EEE7D6;
+    --ivory-dim:#A7A190;
+    --brass:#C9A24A;
+    --brass-dim:#8A7238;
+    --pos:#7A9B6E;
+    --neg:#B5573C;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--ivory);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:28px 18px 80px;}
+
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom:1px solid var(--hair);
+    padding-bottom:18px;
+    margin-bottom:22px;
+  }
+  .brand{display:flex;flex-direction:column;gap:2px;}
+  .brand .mark{
+    font-family:'Fraunces',serif;
+    font-weight:700;
+    font-size:30px;
+    letter-spacing:-0.01em;
+    color:var(--ivory);
+  }
+  .brand .mark span{color:var(--brass);}
+  .brand .sub{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--ivory-dim);
+  }
+  .clock{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    color:var(--ivory-dim);
+    text-align:right;
+  }
+  .clock b{color:var(--brass);display:block;font-size:16px;}
+
+  .banner{
+    background:var(--panel);
+    border:1px solid var(--hair);
+    border-radius:var(--radius);
+    padding:14px 16px;
+    margin-bottom:22px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    color:var(--ivory-dim);
+    line-height:1.6;
+  }
+  .banner b{color:var(--brass);}
+
+  .section-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--brass-dim);
+    margin:0 0 12px 2px;
+  }
+
+  .board{display:flex;flex-direction:column;gap:10px;}
+
+  .row{
+    background:var(--panel);
+    border:1px solid var(--hair);
+    border-radius:var(--radius);
+    padding:14px 16px;
+    display:grid;
+    grid-template-columns:56px 1fr auto;
+    gap:14px;
+    align-items:center;
+    transition:border-color .15s ease, transform .15s ease;
+  }
+  .row:hover{border-color:var(--brass-dim);}
+
+  .flip{
+    background:#0B0F17;
+    border:1px solid var(--hair);
+    border-radius:6px;
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:600;
+    font-size:20px;
+    text-align:center;
+    padding:8px 0;
+    color:var(--brass);
+    position:relative;
+    overflow:hidden;
+  }
+  .flip::after{
+    content:'';
+    position:absolute;top:50%;left:0;right:0;height:1px;
+    background:rgba(0,0,0,0.4);
+  }
+
+  .info .ticker-line{
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .ticker{
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:600;
+    font-size:15px;
+    color:var(--ivory);
+  }
+  .exch{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    color:var(--ivory-dim);
+    border:1px solid var(--hair);
+    border-radius:4px;
+    padding:1px 5px;
+  }
+  .company{
+    font-size:12.5px;
+    color:var(--ivory-dim);
+    margin-top:2px;
+  }
+  .headline{
+    font-size:13px;
+    color:var(--ivory);
+    margin-top:7px;
+    line-height:1.4;
+    max-width:56ch;
+  }
+  .meta-row{
+    display:flex;
+    gap:10px;
+    margin-top:8px;
+    flex-wrap:wrap;
+  }
+  .badge{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:.03em;
+    padding:2px 7px;
+    border-radius:4px;
+    border:1px solid var(--hair);
+  }
+  .badge.pos{color:var(--pos);border-color:rgba(122,155,110,0.4);}
+  .badge.neg{color:var(--neg);border-color:rgba(181,87,60,0.4);}
+  .badge.neu{color:var(--ivory-dim);}
+
+  .side{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:6px;
+  }
+  .vol-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    color:var(--ivory-dim);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+  }
+  .vol-bar{
+    width:74px;height:5px;
+    background:var(--hair);
+    border-radius:3px;
+    overflow:hidden;
+  }
+  .vol-fill{height:100%;background:var(--brass);}
+
+  footer{
+    margin-top:30px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--ivory-dim);
+    text-align:center;
+    line-height:1.7;
+  }
+
+  @media (max-width:560px){
+    .row{grid-template-columns:44px 1fr;}
+    .side{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center;margin-top:8px;}
+    .flip{font-size:16px;padding:6px 0;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="mark">RA<span>DA</span>R</div>
+      <div class="sub">Tablero de atención de mercado</div>
+    </div>
+    <div class="clock">
+      <b id="clock-time">--:--:--</b>
+      <span id="clock-date">—</span>
+    </div>
+  </header>
+
+  <div class="banner">
+    Esto <b>no predice</b> qué acción va a subir. Rankea qué papeles concentran más ruido de noticias, sentiment y volatilidad implícita en este momento — señal de "algo se está moviendo acá", no de "va a subir 5%". <b style="color:var(--neg)">Datos de muestra — no reales.</b>
+  </div>
+
+  <div class="section-label">Ranking por índice de atención · datos de ejemplo</div>
+
+  <div class="board" id="board"></div>
+
+  <footer>
+    RADAR · MVP con datos simulados<br>
+    Cuando conectemos Massive + Claude, esto se actualiza solo cada 15–30 min.
+  </footer>
+
+</div>
+
+<script>
+  const mockData = [
+    {
+      ticker:"NVDA", exch:"NASDAQ", company:"Nvidia Corp",
+      headline:"Casa de análisis eleva el precio objetivo tras nueva línea de chips para centros de datos.",
+      sentiment:"pos", score:94, vol:88
+    },
+    {
+      ticker:"SIEGY", exch:"XETRA", company:"Siemens AG",
+      headline:"Reporte trimestral supera expectativas en la división de automatización industrial.",
+      sentiment:"pos", score:81, vol:62
+    },
+    {
+      ticker:"BABA", exch:"NYSE", company:"Alibaba Group",
+      headline:"Reguladores chinos anuncian revisión antimonopolio sobre su unidad de pagos.",
+      sentiment:"neg", score:79, vol:71
+    },
+    {
+      ticker:"6758.T", exch:"TSE", company:"Sony Group",
+      headline:"Rumores de escisión de la división de sensores generan volumen inusual de operaciones.",
+      sentiment:"neu", score:74, vol:65
+    },
+    {
+      ticker:"MELI", exch:"NASDAQ", company:"MercadoLibre",
+      headline:"Anuncia expansión de créditos al consumo en Brasil y Argentina.",
+      sentiment:"pos", score:68, vol:54
+    },
+    {
+      ticker:"VOD.L", exch:"LSE", company:"Vodafone Group",
+      headline:"Especulación de fusión con operador rival vuelve a circular en medios británicos.",
+      sentiment:"neu", score:61, vol:58
+    },
+    {
+      ticker:"PBR", exch:"NYSE", company:"Petrobras",
+      headline:"Gobierno brasileño interviene en política de precios de combustibles.",
+      sentiment:"neg", score:57, vol:49
+    },
+    {
+      ticker:"ASML", exch:"AEX", company:"ASML Holding",
+      headline:"Restricciones de exportación a China generan incertidumbre sobre pedidos futuros.",
+      sentiment:"neg", score:52, vol:44
+    },
+  ];
+
+  function badgeLabel(s){
+    if(s==="pos") return "SENTIMENT +";
+    if(s==="neg") return "SENTIMENT −";
+    return "SENTIMENT ~";
+  }
+
+  function render(data){
+    const board = document.getElementById('board');
+    board.innerHTML = "";
+    data
+      .slice()
+      .sort((a,b)=>b.score-a.score)
+      .forEach((item, i)=>{
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML = `
+          <div class="flip">${item.score}</div>
+          <div class="info">
+            <div class="ticker-line">
+              <span class="ticker">${item.ticker}</span>
+              <span class="exch">${item.exch}</span>
+            </div>
+            <div class="company">${item.company}</div>
+            <div class="headline">${item.headline}</div>
+            <div class="meta-row">
+              <span class="badge ${item.sentiment}">${badgeLabel(item.sentiment)}</span>
+              <span class="badge neu">RANK #${i+1}</span>
+            </div>
+          </div>
+          <div class="side">
+            <span class="vol-label">Volatilidad</span>
+            <div class="vol-bar"><div class="vol-fill" style="width:${item.vol}%"></div></div>
+          </div>
+        `;
+        board.appendChild(row);
+      });
+  }
+
+  function tickClock(){
+    const now = new Date();
+    document.getElementById('clock-time').textContent =
+      now.toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    document.getElementById('clock-date').textContent =
+      now.toLocaleDateString('es-AR', {weekday:'short', day:'2-digit', month:'short'});
+  }
+
+  async function loadData(){
+    try{
+      const res = await fetch('/.netlify/functions/get-signals');
+      const data = await res.json();
+      if(Array.isArray(data) && data.length > 0){
+        render(data);
+        document.querySelector('.section-label').textContent =
+          'Ranking por índice de atención · datos en vivo';
+        return;
+      }
+    }catch(e){
+      console.log('Sin datos en vivo todavía, muestro ejemplo:', e.message);
+    }
+    render(mockData);
+  }
+
+  loadData();
+  tickClock();
+  setInterval(tickClock, 1000);
+  setInterval(loadData, 5 * 60 * 1000); // refresca la vista cada 5 min
+</script>
+</body>
+</html>
