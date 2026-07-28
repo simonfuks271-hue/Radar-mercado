@@ -1,15 +1,6 @@
-const { createClient } = require('@supabase/supabase-js');
-const Anthropic = require('@anthropic-ai/sdk');
-
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-// Cuantos tickers distintos procesamos como maximo por corrida.
-const MAX_TICKERS = 60;
-// Cuantos articulos de noticias generales miramos para descubrir tickers.
-// Mas alto = mas chance de encontrar acciones chicas/poco conocidas, no
-// solo las grandes que siempre estan en el feed.
-const NEWS_FEED_LIMIT = 500;
+// Cuantas horas hacia atras consideramos una noticia "fresca".
+// Todo lo mas viejo que esto se descarta antes de analizar.
+const FRESHNESS_HOURS = 12;
 
 // 1) Trae el feed general de noticias (sin filtrar por ticker) y arma
 //    un mapa de que tickers aparecen mencionados y con que frecuencia.
@@ -17,9 +8,16 @@ async function discoverTickers() {
   const url = `https://api.massive.com/v2/reference/news?limit=${NEWS_FEED_LIMIT}&order=desc&sort=published_utc&apiKey=${process.env.MASSIVE_API_KEY}`;
   const res = await fetch(url);
   const data = await res.json();
-  const articles = data.results || [];
+  const allArticles = data.results || [];
+
+  const cutoff = Date.now() - FRESHNESS_HOURS * 60 * 60 * 1000;
+  const articles = allArticles.filter((a) => {
+    if (!a.published_utc) return false;
+    return new Date(a.published_utc).getTime() >= cutoff;
+  });
 
   const byTicker = {};
+
   for (const article of articles) {
     const tickers = article.tickers || [];
     for (const t of tickers) {
