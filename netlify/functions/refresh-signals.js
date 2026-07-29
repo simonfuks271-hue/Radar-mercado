@@ -5,7 +5,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Cuantos tickers distintos procesamos como maximo por corrida.
-const MAX_TICKERS = 15;
+const MAX_TICKERS = 5;
 
 // Cuantos articulos de noticias generales miramos para descubrir tickers.
 const NEWS_FEED_LIMIT = 500;
