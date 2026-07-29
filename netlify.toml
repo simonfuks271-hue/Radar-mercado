@@ -2,5 +2,5 @@
   publish = "."
   functions = "netlify/functions"
 
-[functions."refresh-signals"]
+[functions."refresh-signals-background"]
   schedule = "*/30 * * * *"
