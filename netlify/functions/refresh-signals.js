@@ -1,3 +1,14 @@
+const { createClient } = require('@supabase/supabase-js');
+const Anthropic = require('@anthropic-ai/sdk');
+
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Cuantos tickers distintos procesamos como maximo por corrida.
+const MAX_TICKERS = 60;
+// Cuantos articulos de noticias generales miramos para descubrir tickers.
+const NEWS_FEED_LIMIT = 500;
+
 // Cuantas horas hacia atras consideramos una noticia "fresca".
 // Todo lo mas viejo que esto se descarta antes de analizar.
 const FRESHNESS_HOURS = 12;
@@ -84,6 +95,11 @@ async function getSpark(ticker) {
 
 exports.handler = async function () {
   const results = [];
+
+  // Limpieza: borra senales viejas que ya no se actualizaron
+  // en las ultimas 24hs, para que no se acumulen para siempre.
+  const staleCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  await supabase.from('signals').delete().lt('updated_at', staleCutoff);
 
   let discovered;
   try {
