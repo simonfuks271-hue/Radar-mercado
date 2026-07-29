@@ -93,10 +93,7 @@ async function getSpark(ticker) {
     return [];
   }
 }
-
 exports.handler = async function () {
-  const results = [];
-
   // Limpieza: borra senales viejas que ya no se actualizaron
   // en las ultimas 24hs, para que no se acumulen para siempre.
   const staleCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -110,31 +107,32 @@ exports.handler = async function () {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 
-  for (const [ticker, articles] of discovered) {
-    try {
+  // Procesa TODOS los tickers en paralelo, no uno por uno.
+  const settled = await Promise.allSettled(
+    discovered.map(async ([ticker, articles]) => {
       const headlines = articles.slice(0, 3).map((a) => a.title).join('\n');
       const mostRecent = articles[0];
 
-      const { company, exch, market_cap } = await getTickerInfo(ticker);
-
-      const sentimentResp = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 300,
-        messages: [
-          {
-            role: 'user',
-            content: `Analiza estas noticias recientes sobre ${company} (${ticker}):\n${headlines}\n\nRespondé SOLO con un JSON, sin texto adicional ni markdown, con este formato exacto:\n{"sentiment":"pos|neg|neu","score":0-100,"headline":"resumen breve en español de la noticia mas relevante, en tus propias palabras"}\n\n"sentiment" = si el contenido de la noticia sugiere una reacción de mercado probablemente alcista (pos), bajista (neg), o neutra/mixta (neu) para esta acción. Esto es una lectura del tono de la noticia, NO una predicción garantizada de precio.\nEl "score" representa que tan relevante/atencion-generadora es la noticia.`,
-          },
-        ],
-      });
+      const [{ company, exch, market_cap }, sentimentResp, priceData, spark] = await Promise.all([
+        getTickerInfo(ticker),
+        anthropic.messages.create({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 300,
+          messages: [
+            {
+              role: 'user',
+              content: `Analiza estas noticias recientes sobre ${ticker}:\n${headlines}\n\nRespondé SOLO con un JSON, sin texto adicional ni markdown, con este formato exacto:\n{"sentiment":"pos|neg|neu","score":0-100,"headline":"resumen breve en español de la noticia mas relevante, en tus propias palabras"}\n\n"sentiment" = si el contenido de la noticia sugiere una reacción de mercado probablemente alcista (pos), bajista (neg), o neutra/mixta (neu) para esta acción. Esto es una lectura del tono de la noticia, NO una predicción garantizada de precio.\nEl "score" representa que tan relevante/atencion-generadora es la noticia.`,
+            },
+          ],
+        }),
+        getPrice(ticker),
+        getSpark(ticker),
+      ]);
 
       const raw = sentimentResp.content[0].text.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(raw);
 
-      const { price, change_pct, day_open, day_high, day_low, day_volume } = await getPrice(ticker);
-      const spark = await getSpark(ticker);
-
-      results.push({
+      return {
         ticker,
         exch,
         company,
@@ -142,23 +140,29 @@ exports.handler = async function () {
         sentiment: parsed.sentiment,
         score: parsed.score,
         vol: Math.min(100, articles.length * 15),
-        price,
-        change_pct,
-        day_open,
-        day_high,
-        day_low,
-        day_volume,
+        price: priceData.price,
+        change_pct: priceData.change_pct,
+        day_open: priceData.day_open,
+        day_high: priceData.day_high,
+        day_low: priceData.day_low,
+        day_volume: priceData.day_volume,
         market_cap,
         published_at: mostRecent.published_utc || null,
         spark,
         url: mostRecent.article_url || null,
         image_url: mostRecent.image_url || null,
         updated_at: new Date().toISOString(),
-      });
-    } catch (err) {
-      console.error(`Error procesando ${ticker}:`, err.message);
-    }
-  }
+      };
+    })
+  );
+
+  const results = settled
+    .filter((r) => r.status === 'fulfilled')
+    .map((r) => r.value);
+
+  settled
+    .filter((r) => r.status === 'rejected')
+    .forEach((r) => console.error('Error procesando ticker:', r.reason && r.reason.message));
 
   if (results.length > 0) {
     await supabase.from('signals').upsert(results, { onConflict: 'ticker' });
@@ -169,3 +173,4 @@ exports.handler = async function () {
     body: JSON.stringify({ updated: results.length, discovered: discovered.length }),
   };
 };
+
