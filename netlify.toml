@@ -1,6 +1,3 @@
 [build]
   publish = "."
   functions = "netlify/functions"
-
-[functions."refresh-signals-background"]
-  schedule = "*/30 * * * *"
