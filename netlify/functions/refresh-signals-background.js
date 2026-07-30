@@ -4,18 +4,10 @@ const Anthropic = require('@anthropic-ai/sdk');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Cuantos tickers distintos procesamos como maximo por corrida.
-const MAX_TICKERS = 15;
-
-// Cuantos articulos de noticias generales miramos para descubrir tickers.
+const MAX_TICKERS = 5;
 const NEWS_FEED_LIMIT = 500;
-
-// Cuantas horas hacia atras consideramos una noticia "fresca".
-// Todo lo mas viejo que esto se descarta antes de analizar.
 const FRESHNESS_HOURS = 12;
 
-// 1) Trae el feed general de noticias (sin filtrar por ticker) y arma
-//    un mapa de que tickers aparecen mencionados y con que frecuencia.
 async function discoverTickers() {
   const url = `https://api.massive.com/v2/reference/news?limit=${NEWS_FEED_LIMIT}&order=desc&sort=published_utc&apiKey=${process.env.MASSIVE_API_KEY}`;
   const res = await fetch(url);
@@ -29,7 +21,6 @@ async function discoverTickers() {
   });
 
   const byTicker = {};
-
   for (const article of articles) {
     const tickers = article.tickers || [];
     for (const t of tickers) {
@@ -42,7 +33,6 @@ async function discoverTickers() {
   return sorted.slice(0, MAX_TICKERS);
 }
 
-// 2) Nombre de la empresa y exchange, vía referencia de Massive
 async function getTickerInfo(ticker) {
   try {
     const url = `https://api.massive.com/v3/reference/tickers/${ticker}?apiKey=${process.env.MASSIVE_API_KEY}`;
@@ -56,7 +46,6 @@ async function getTickerInfo(ticker) {
   }
 }
 
-// 3) Precio EN VIVO (ultima operacion) + variacion % vs cierre anterior.
 async function getPrice(ticker) {
   try {
     const url = `https://api.massive.com/v2/snapshot/locale/us/markets/stocks/tickers/${ticker}?apiKey=${process.env.MASSIVE_API_KEY}`;
@@ -80,7 +69,6 @@ async function getPrice(ticker) {
   }
 }
 
-// 4) Velas intradiarias para el mini-grafico
 async function getSpark(ticker) {
   try {
     const to = new Date().toISOString().slice(0, 10);
@@ -93,19 +81,17 @@ async function getSpark(ticker) {
     return [];
   }
 }
-exports.handler = async function () {
-  const results = [];
 
-  // Limpieza: borra senales viejas que ya no se actualizaron
-  // en las ultimas 24hs, para que no se acumulen para siempre.
-  const staleCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  await supabase.from('signals').delete().lt('updated_at', staleCutoff);
+exports.handler = async function () {
+  console.log('INICIO refresh-signals-background');
+  const results = [];
 
   let discovered;
   try {
     discovered = await discoverTickers();
+    console.log('Tickers descubiertos:', discovered.length);
   } catch (err) {
-    console.error('Error descubriendo tickers desde noticias:', err.message);
+    console.error('Error descubriendo tickers:', err.message);
     return;
   }
 
@@ -113,7 +99,6 @@ exports.handler = async function () {
     try {
       const headlines = articles.slice(0, 3).map((a) => a.title).join('\n');
       const mostRecent = articles[0];
-
       const { company, exch, market_cap } = await getTickerInfo(ticker);
 
       const sentimentResp = await anthropic.messages.create({
@@ -129,7 +114,6 @@ exports.handler = async function () {
 
       const raw = sentimentResp.content[0].text.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(raw);
-
       const { price, change_pct, day_open, day_high, day_low, day_volume } = await getPrice(ticker);
       const spark = await getSpark(ticker);
 
@@ -154,13 +138,22 @@ exports.handler = async function () {
         image_url: mostRecent.image_url || null,
         updated_at: new Date().toISOString(),
       });
+      console.log(`OK ${ticker}`);
     } catch (err) {
       console.error(`Error procesando ${ticker}:`, err.message);
     }
   }
 
-  if (results.length > 0) {
-    await supabase.from('signals').upsert(results, { onConflict: 'ticker' });
-  }
-};
+  console.log('Resultados a guardar:', results.length);
 
+  if (results.length > 0) {
+    const { error } = await supabase.from('signals').upsert(results, { onConflict: 'ticker' });
+    if (error) {
+      console.error('ERROR guardando en Supabase:', error.message);
+    } else {
+      console.log('Guardado en Supabase OK');
+    }
+  }
+
+  console.log('FIN refresh-signals-background');
+};
