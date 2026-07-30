@@ -4,7 +4,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const MAX_TICKERS = 5;
+const MAX_TICKERS = 15;
 const NEWS_FEED_LIMIT = 500;
 const FRESHNESS_HOURS = 12;
 
@@ -40,7 +40,11 @@ async function getTickerInfo(ticker) {
     const data = await res.json();
     const r = data.results;
     if (!r) return { company: ticker, exch: '', market_cap: null };
-    return { company: r.name || ticker, exch: r.primary_exchange || '', market_cap: r.market_cap || null };
+    return {
+      company: r.name || ticker,
+      exch: r.primary_exchange || '',
+      market_cap: r.market_cap != null ? Math.round(r.market_cap) : null,
+    };
   } catch (err) {
     return { company: ticker, exch: '', market_cap: null };
   }
@@ -62,7 +66,7 @@ async function getPrice(ticker) {
       day_open: day.o || null,
       day_high: day.h || null,
       day_low: day.l || null,
-      day_volume: day.v || null,
+      day_volume: day.v != null ? Math.round(day.v) : null,
     };
   } catch (err) {
     return { price: null, change_pct: null, day_open: null, day_high: null, day_low: null, day_volume: null };
